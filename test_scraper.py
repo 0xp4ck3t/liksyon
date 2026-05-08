@@ -1,5 +1,10 @@
+from dotenv import load_dotenv
+from src.liksyon.agent import pick_model, run_agent
+from src.liksyon.chunker import estimate_cost
 from src.liksyon.scraper import UdemyScraper
 from src.liksyon.storage import init_db, save_transcript
+
+load_dotenv()
 
 
 def pick_course(courses: list[dict]) -> dict:
@@ -87,10 +92,23 @@ def main():
             save_transcript(t, course_title=course["title"])
         print(f"Saved {len(transcripts)} lectures to data/liksyon.db")
 
-        print(f"\n=== Preview (first 3) ===")
-        for t in transcripts[:3]:
-            print(f"\n--- {t['chapter']} > {t['title']} ---")
-            print(t["transcript"][:300] if t["transcript"] else "(no transcript)")
+        # cost estimate before sending to Claude
+        model = pick_model()
+        est = estimate_cost(transcripts, model)
+        print(f"\nEstimated usage:")
+        print(f"  Lectures : {est['lectures']}")
+        print(f"  Chunks   : {est['chunks']}")
+        print(f"  Tokens   : {est['tokens']:,}")
+        print(f"  Cost     : ~${est['estimated_cost_usd']} USD ({est['model']})")
+        print()
+        confirm = input("Proceed with flashcard generation? (yes/no): ").strip().lower()
+        if confirm not in ("yes", "y"):
+            print("Aborted.")
+            return
+
+        print("\nGenerating flashcards...\n")
+        cards = run_agent(transcripts, course_title=course["title"], model=model)
+        print(f"\nDone. {len(cards)} flashcard(s) saved to database.")
 
 
 if __name__ == "__main__":
