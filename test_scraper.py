@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from src.liksyon.agent import pick_model, run_agent
 from src.liksyon.chunker import estimate_cost
-from src.liksyon.scraper import UdemyScraper
+from src.liksyon.scraper import UdemyScraper, pick_browser
 from src.liksyon.storage import init_db, save_transcript
 
 load_dotenv()
@@ -59,7 +59,8 @@ def pick_lectures(lectures: list[dict]) -> list[dict]:
 
 def main():
     init_db()
-    with UdemyScraper() as scraper:
+    browser = pick_browser()
+    with UdemyScraper(browser=browser) as scraper:
         print("Checking login...")
         if not scraper.is_logged_in():
             print("Not logged in. Please log into Udemy in Firefox and try again.")

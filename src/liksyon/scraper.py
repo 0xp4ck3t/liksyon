@@ -1,15 +1,9 @@
-import json
 import random
 import re
-import shutil
-import sqlite3
-import tempfile
 import time
-from pathlib import Path
 
+import browser_cookie3
 import requests
-
-FIREFOX_PROFILE = Path.home() / "Library/Application Support/Firefox/Profiles/3jw93za9.default-release"
 
 API_FIELDS = (
     "?page_size=200"
@@ -19,43 +13,73 @@ API_FIELDS = (
     "&caching_intent=True"
 )
 
+BROWSERS = {
+    "1": ("firefox",   "Firefox"),
+    "2": ("chrome",    "Chrome"),
+    "3": ("chromium",  "Chromium"),
+    "4": ("edge",      "Microsoft Edge"),
+    "5": ("brave",     "Brave"),
+    "6": ("safari",    "Safari (Mac only)"),
+}
 
-def load_firefox_cookies(profile_path: Path = FIREFOX_PROFILE) -> dict:
-    cookies_db = profile_path / "cookies.sqlite"
-    if not cookies_db.exists():
-        raise FileNotFoundError(f"Firefox cookies not found at {cookies_db}")
+_BROWSER_LOADERS = {
+    "firefox":  browser_cookie3.firefox,
+    "chrome":   browser_cookie3.chrome,
+    "chromium": browser_cookie3.chromium,
+    "edge":     browser_cookie3.edge,
+    "brave":    browser_cookie3.brave,
+    "safari":   browser_cookie3.safari,
+}
 
-    # Copy to temp — Firefox may have the file locked
-    with tempfile.NamedTemporaryFile(suffix=".sqlite", delete=False) as f:
-        tmp = Path(f.name)
-    shutil.copy2(cookies_db, tmp)
+_USER_AGENTS = {
+    "firefox":  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+    "chrome":   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "chromium": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "edge":     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0",
+    "brave":    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "safari":   "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+}
 
+
+def pick_browser() -> str:
+    print("\nWhich browser are you logged into Udemy with?")
+    for key, (_, label) in BROWSERS.items():
+        print(f"  [{key}] {label}")
+    print()
+    while True:
+        choice = input("Pick a browser: ").strip()
+        if choice in BROWSERS:
+            browser_id, label = BROWSERS[choice]
+            print(f"Using {label}\n")
+            return browser_id
+        print(f"  Enter a number between 1 and {len(BROWSERS)}.")
+
+
+def load_browser_cookies(browser: str) -> requests.cookies.RequestsCookieJar:
+    loader = _BROWSER_LOADERS.get(browser)
+    if not loader:
+        raise ValueError(f"Unsupported browser: {browser}")
     try:
-        conn = sqlite3.connect(tmp)
-        rows = conn.execute(
-            "SELECT name, value FROM moz_cookies WHERE host LIKE '%udemy.com'"
-        ).fetchall()
-        conn.close()
-    finally:
-        tmp.unlink(missing_ok=True)
-
-    return {name: value for name, value in rows}
+        return loader(domain_name=".udemy.com")
+    except Exception as e:
+        raise RuntimeError(
+            f"Could not read {browser} cookies.\n"
+            f"Make sure you are logged into Udemy in {browser} and it is not running "
+            f"in a way that locks the cookie file.\nDetail: {e}"
+        )
 
 
 class UdemyScraper:
-    def __init__(self, profile_path: Path = FIREFOX_PROFILE):
-        self.profile_path = profile_path
+    def __init__(self, browser: str = "firefox"):
+        self.browser = browser
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": (
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:124.0) "
-                "Gecko/20100101 Firefox/124.0"
-            ),
+            "User-Agent": _USER_AGENTS.get(browser, _USER_AGENTS["firefox"]),
             "Referer": "https://www.udemy.com/",
         })
 
     def __enter__(self):
-        cookies = load_firefox_cookies(self.profile_path)
+        cookies = load_browser_cookies(self.browser)
         self.session.cookies.update(cookies)
         return self
 
