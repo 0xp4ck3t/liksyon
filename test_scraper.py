@@ -1,4 +1,5 @@
 from src.liksyon.scraper import UdemyScraper
+from src.liksyon.storage import init_db, save_transcript
 
 
 def pick_course(courses: list[dict]) -> dict:
@@ -52,6 +53,7 @@ def pick_lectures(lectures: list[dict]) -> list[dict]:
 
 
 def main():
+    init_db()
     with UdemyScraper() as scraper:
         print("Checking login...")
         if not scraper.is_logged_in():
@@ -79,6 +81,11 @@ def main():
         selected = pick_lectures(lectures)
         print(f"\nScraping {len(selected)} lecture(s)...\n")
         transcripts = scraper.scrape_lectures(selected, course_id)
+
+        print(f"\nSaving to database...")
+        for t in transcripts:
+            save_transcript(t, course_title=course["title"])
+        print(f"Saved {len(transcripts)} lectures to data/liksyon.db")
 
         print(f"\n=== Preview (first 3) ===")
         for t in transcripts[:3]:
