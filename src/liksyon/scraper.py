@@ -1,6 +1,8 @@
+import platform
 import random
 import re
 import time
+from pathlib import Path
 
 import browser_cookie3
 import requests
@@ -55,17 +57,52 @@ def pick_browser() -> str:
         print(f"  Enter a number between 1 and {len(BROWSERS)}.")
 
 
+def _find_firefox_cookie_file() -> str:
+    os_name = platform.system()
+    if os_name == "Darwin":
+        base = Path.home() / "Library/Application Support/Firefox/Profiles"
+    elif os_name == "Linux":
+        base = Path.home() / ".mozilla/firefox"
+    elif os_name == "Windows":
+        base = Path.home() / "AppData/Roaming/Mozilla/Firefox/Profiles"
+    else:
+        raise RuntimeError(f"Unsupported OS: {os_name}")
+
+    if not base.exists():
+        raise FileNotFoundError(f"Firefox profiles folder not found: {base}")
+
+    profiles = [p for p in base.iterdir() if p.is_dir()]
+    # prefer default-release, fall back to any default profile
+    profile = (
+        next((p for p in profiles if p.name.endswith(".default-release")), None)
+        or next((p for p in profiles if "default" in p.name), None)
+        or (profiles[0] if profiles else None)
+    )
+    if not profile:
+        raise FileNotFoundError("No Firefox profile found.")
+
+    cookie_file = profile / "cookies.sqlite"
+    if not cookie_file.exists():
+        raise FileNotFoundError(f"cookies.sqlite not found in profile: {profile}")
+
+    return str(cookie_file)
+
+
 def load_browser_cookies(browser: str) -> requests.cookies.RequestsCookieJar:
     loader = _BROWSER_LOADERS.get(browser)
     if not loader:
         raise ValueError(f"Unsupported browser: {browser}")
     try:
+        if browser == "firefox":
+            cookie_file = _find_firefox_cookie_file()
+            return loader(cookie_file=cookie_file, domain_name=".udemy.com")
         return loader(domain_name=".udemy.com")
+    except RuntimeError:
+        raise
     except Exception as e:
         raise RuntimeError(
-            f"Could not read {browser} cookies.\n"
-            f"Make sure you are logged into Udemy in {browser} and it is not running "
-            f"in a way that locks the cookie file.\nDetail: {e}"
+            f"Could not read {browser} cookies. "
+            f"Make sure you are logged into Udemy in {browser}.\nDetail: {e}"
         )
 
 
