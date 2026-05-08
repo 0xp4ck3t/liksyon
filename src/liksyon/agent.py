@@ -1,7 +1,9 @@
 import json
+import os
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from src.liksyon.chunker import chunk_transcript, count_tokens
 from src.liksyon.storage import (
     chunk_hash,
@@ -44,17 +46,38 @@ Respond ONLY with valid JSON — no explanation, no markdown, no extra text:
 """
 
 
-def check_claude_installed():
-    if not shutil.which("claude"):
-        raise RuntimeError(
-            "Claude Code CLI not found. "
-            "Install it from https://claude.ai/code and make sure it's in your PATH."
-        )
+_CLAUDE_SEARCH_PATHS = [
+    Path.home() / ".local/bin/claude",
+    Path("/usr/local/bin/claude"),
+    Path("/opt/homebrew/bin/claude"),
+    Path.home() / ".npm-global/bin/claude",
+    Path.home() / "AppData/Roaming/npm/claude",  # Windows
+]
+
+
+def _find_claude() -> str:
+    # Check PATH first
+    found = shutil.which("claude")
+    if found:
+        return found
+    # Fall back to common install locations
+    for path in _CLAUDE_SEARCH_PATHS:
+        if path.exists():
+            return str(path)
+    raise RuntimeError(
+        "Claude Code CLI not found. "
+        "Install it from https://claude.ai/code and make sure it's in your PATH."
+    )
+
+
+def check_claude_installed() -> str:
+    return _find_claude()
 
 
 def call_claude(prompt: str, timeout: int = 120) -> str:
+    claude_bin = _find_claude()
     result = subprocess.run(
-        ["claude", "-p", prompt],
+        [claude_bin, "-p", prompt],
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -112,7 +135,7 @@ def run_agent(
     course_title: str,
     max_cards_per_lecture: int = 10,
 ) -> list[dict]:
-    check_claude_installed()
+    check_claude_installed()  # validates early before processing begins
     all_cards = []
 
     for lecture in transcripts:
