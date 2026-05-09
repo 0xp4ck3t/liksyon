@@ -174,10 +174,17 @@ class UdemyScraper:
                 })
         return lectures
 
-    def _fetch_vtt(self, vtt_url: str) -> str:
-        resp = self.session.get(vtt_url, timeout=30)
-        resp.raise_for_status()
-        return resp.text
+    def _fetch_vtt(self, vtt_url: str, retries: int = 3) -> str:
+        for attempt in range(1, retries + 1):
+            try:
+                resp = self.session.get(vtt_url, timeout=30)
+                resp.raise_for_status()
+                return resp.text
+            except Exception as e:
+                if attempt == retries:
+                    raise
+                print(f"    (retry {attempt}/{retries - 1}: {e})")
+                time.sleep(2 * attempt)
 
     def _parse_vtt(self, vtt: str) -> str:
         lines = []
@@ -195,8 +202,12 @@ class UdemyScraper:
         for i, lecture in enumerate(lectures):
             print(f"  [{i + 1}/{len(lectures)}] {lecture['chapter']} — {lecture['title']}")
             if lecture["caption_url"]:
-                vtt = self._fetch_vtt(lecture["caption_url"])
-                transcript_text = self._parse_vtt(vtt)
+                try:
+                    vtt = self._fetch_vtt(lecture["caption_url"])
+                    transcript_text = self._parse_vtt(vtt)
+                except Exception as e:
+                    print(f"    (failed to fetch transcript: {e})")
+                    transcript_text = None
             else:
                 print("    (no captions — skipping)")
                 transcript_text = None
