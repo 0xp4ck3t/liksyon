@@ -1,4 +1,6 @@
 import hashlib
+import html
+import json
 import re
 from pathlib import Path
 
@@ -114,7 +116,6 @@ def export_to_apkg(flashcards: list[dict], course_title: str) -> Path:
 
         tags = card.get("tags") or []
         if isinstance(tags, str):
-            import json
             tags = json.loads(tags)
 
         difficulty = card.get("difficulty", "medium")
@@ -122,12 +123,12 @@ def export_to_apkg(flashcards: list[dict], course_title: str) -> Path:
         note = genanki.Note(
             model=model,
             fields=[
-                card["front"],
-                card["back"],
-                card.get("source_lecture", ""),
+                html.escape(card["front"]),
+                html.escape(card["back"]),
+                html.escape(card.get("source_lecture", "")),
                 difficulty.capitalize(),
                 f"difficulty-{difficulty}",
-                "  ".join(f"[{t}]" for t in tags),
+                "  ".join(f"[{html.escape(t)}]" for t in tags),
             ],
             tags=tags,
             guid=genanki.guid_for(card["front"]),
