@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -12,38 +11,26 @@ from src.liksyon.storage import (
     save_flashcard,
 )
 
-PROMPT_TEMPLATE = """\
-You are an expert educator generating Anki flashcards from a course lecture transcript.
+SKILLS_DIR = Path(__file__).parents[3] / ".claude" / "skills"
 
-Rules:
-- Create cards that test UNDERSTANDING, not just memorisation
-- Prefer applied questions: "When would you use X?", "What happens if Y?"
-- Keep each card atomic — one concept per card
-- Avoid vague or trivial cards
-- Mix card types: conceptual, applied, process, distinction
-- Difficulty: easy = recall, medium = application, hard = analysis/comparison
-- Generate between 3 and 8 cards depending on how much content the chunk has
 
-Course: {course_title}
-Section: {chapter}
-Lecture: {lecture_title}
+def load_skill(name: str) -> str:
+    skill_file = SKILLS_DIR / name / "SKILL.md"
+    if not skill_file.exists():
+        raise FileNotFoundError(f"Skill not found: {skill_file}")
+    content = skill_file.read_text()
+    # strip YAML frontmatter
+    if content.startswith("---"):
+        end = content.find("---", 3)
+        if end != -1:
+            content = content[end + 3:].strip()
+    return content
 
-Transcript chunk:
-{transcript}
 
-Respond ONLY with valid JSON — no explanation, no markdown, no extra text:
-{{
-  "cards": [
-    {{
-      "front": "question",
-      "back": "answer",
-      "tags": ["tag1", "tag2"],
-      "difficulty": "easy|medium|hard",
-      "card_type": "conceptual|applied|process|distinction"
-    }}
-  ]
-}}
-"""
+def render_skill(skill: str, **variables) -> str:
+    for key, value in variables.items():
+        skill = skill.replace("{{" + key + "}}", value)
+    return skill
 
 
 _CLAUDE_SEARCH_PATHS = [
@@ -118,8 +105,10 @@ def _generate_cards_for_chunk(
     lecture_title: str,
     chapter: str,
     course_title: str,
+    skill: str,
 ) -> list[dict]:
-    prompt = PROMPT_TEMPLATE.format(
+    prompt = render_skill(
+        skill,
         course_title=course_title,
         chapter=chapter,
         lecture_title=lecture_title,
@@ -136,6 +125,7 @@ def run_agent(
     max_cards_per_lecture: int = 10,
 ) -> list[dict]:
     check_claude_installed()  # validates early before processing begins
+    skill = load_skill("make_flashcards")
     all_cards = []
 
     for lecture in transcripts:
@@ -162,7 +152,7 @@ def run_agent(
             print(f"    chunk {chunk['chunk_index'] + 1}/{len(chunks)} — {chunk['token_count']} tokens")
 
             try:
-                cards = _generate_cards_for_chunk(chunk, lecture_title, chapter, course_title)
+                cards = _generate_cards_for_chunk(chunk, lecture_title, chapter, course_title, skill)
             except Exception as e:
                 print(f"    ✗ failed: {e}")
                 continue

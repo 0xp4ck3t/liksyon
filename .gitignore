@@ -10,3 +10,4 @@ dist/
 .DS_Store
 CLAUDE.md
 CLAUDE.MD
+.claude/settings*
