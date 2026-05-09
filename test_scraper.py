@@ -1,6 +1,7 @@
 from src.liksyon.agent import run_agent
+from src.liksyon.export.genanki_export import export_to_apkg
 from src.liksyon.scraper import UdemyScraper, pick_browser
-from src.liksyon.storage import init_db, save_transcript
+from src.liksyon.storage import get_flashcards, init_db, save_transcript
 
 
 def pick_course(courses: list[dict]) -> dict:
@@ -92,6 +93,11 @@ def main():
         print("\nGenerating flashcards...\n")
         cards = run_agent(transcripts, course_title=course["title"])
         print(f"\nDone. {len(cards)} flashcard(s) saved to database.")
+
+        print("\nExporting to Anki...")
+        all_cards = get_flashcards(course_id)
+        apkg_path = export_to_apkg(all_cards, course_title=course["title"])
+        print(f"Exported → {apkg_path}")
 
 
 if __name__ == "__main__":
