@@ -11,7 +11,7 @@ from src.liksyon.storage import (
     save_flashcard,
 )
 
-SKILLS_DIR = Path(__file__).parents[3] / ".claude" / "skills"
+SKILLS_DIR = Path(__file__).parents[2] / ".claude" / "skills"
 
 
 def load_skill(name: str) -> str:
@@ -167,6 +167,7 @@ def run_agent(
                     "back":           card["back"],
                     "tags":           card.get("tags", []),
                     "difficulty":     card.get("difficulty", "medium"),
+                    "chapter":        chapter,
                     "source_lecture": lecture_title,
                     "source_course":  course_title,
                     "chunk_hash":     h,

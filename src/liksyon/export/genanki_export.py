@@ -106,8 +106,7 @@ def export_to_apkg(flashcards: list[dict], course_title: str) -> Path:
     package_decks = []
 
     for card in flashcards:
-        chapter = card.get("source_lecture") or "General"
-        deck_name = f"{course_title}::{card.get('chapter', 'General')}"
+        deck_name = f"{course_title}::{card.get('chapter') or 'General'}"
 
         if deck_name not in decks:
             deck = genanki.Deck(_stable_id(deck_name), deck_name)

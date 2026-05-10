@@ -1,4 +1,5 @@
 from src.liksyon.agent import run_agent
+from src.liksyon.export.ankiconnect import deliver_to_anki
 from src.liksyon.export.genanki_export import export_to_apkg
 from src.liksyon.scraper import UdemyScraper, pick_browser
 from src.liksyon.storage import get_flashcards, init_db, save_transcript
@@ -17,31 +18,56 @@ def pick_course(courses: list[dict]) -> dict:
 
 
 def pick_lectures(lectures: list[dict]) -> list[dict]:
+    # build section index: section_num → list of lecture indices (1-based)
+    sections: list[tuple[str, list[int]]] = []
+    current_chapter = None
+    current_section_indices: list[int] = []
+
+    for i, lec in enumerate(lectures, 1):
+        if lec["chapter"] != current_chapter:
+            if current_chapter is not None:
+                sections.append((current_chapter, current_section_indices))
+            current_chapter = lec["chapter"]
+            current_section_indices = []
+        current_section_indices.append(i)
+    if current_chapter is not None:
+        sections.append((current_chapter, current_section_indices))
+
     print("\n=== Lectures ===\n")
+    sec_idx = 1
+    sec_map: dict[int, list[int]] = {}
     current_chapter = None
     for i, lec in enumerate(lectures, 1):
         if lec["chapter"] != current_chapter:
             current_chapter = lec["chapter"]
-            print(f"\n  {current_chapter}")
+            sec_map[sec_idx] = next(idxs for ch, idxs in sections if ch == current_chapter)
+            print(f"\n  [s{sec_idx}] {current_chapter}")
+            sec_idx += 1
         has_transcript = "✓" if lec["caption_url"] else "✗"
         print(f"    [{i:>3}] {has_transcript} {lec['title']}")
 
     print("\n  ✓ = has transcript   ✗ = no transcript")
     print("\nPick lectures to scrape:")
     print("  all       — scrape everything")
-    print("  1,2,5     — specific numbers")
-    print("  1-10      — a range")
+    print("  s1,s2     — entire sections by number")
+    print("  1,2,5     — specific lecture numbers")
+    print("  1-10      — a range of lectures")
     print()
 
     while True:
         raw = input("Your selection: ").strip().lower()
         if raw == "all":
             return lectures
+
         try:
             indices = set()
             for part in raw.split(","):
                 part = part.strip()
-                if "-" in part:
+                if part.startswith("s"):
+                    sn = int(part[1:])
+                    if sn in sec_map:
+                        indices.update(sec_map[sn])
+                elif "-" in part:
                     start, end = part.split("-")
                     indices.update(range(int(start), int(end) + 1))
                 else:
@@ -51,7 +77,7 @@ def pick_lectures(lectures: list[dict]) -> list[dict]:
                 return selected
         except (ValueError, IndexError):
             pass
-        print(f"  Invalid selection. Try again.")
+        print("  Invalid selection. Try again.")
 
 
 def main():
@@ -97,7 +123,7 @@ def main():
         print("\nExporting to Anki...")
         all_cards = get_flashcards(course_id)
         apkg_path = export_to_apkg(all_cards, course_title=course["title"])
-        print(f"Exported → {apkg_path}")
+        deliver_to_anki(all_cards, course_title=course["title"], apkg_path=apkg_path)
 
 
 if __name__ == "__main__":

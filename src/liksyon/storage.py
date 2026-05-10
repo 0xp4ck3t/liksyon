@@ -43,12 +43,18 @@ def init_db():
                 back           TEXT NOT NULL,
                 tags           TEXT,
                 difficulty     TEXT,
+                chapter        TEXT,
                 source_lecture TEXT,
                 source_course  TEXT,
                 chunk_hash     TEXT,
                 created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        # migrate existing databases that predate the chapter column
+        try:
+            conn.execute("ALTER TABLE flashcards ADD COLUMN chapter TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 def save_transcript(lecture: dict, course_title: str = ""):
@@ -111,8 +117,8 @@ def save_flashcard(card: dict):
             """
             INSERT INTO flashcards
                 (lecture_id, course_id, front, back, tags, difficulty,
-                 source_lecture, source_course, chunk_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 chapter, source_lecture, source_course, chunk_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 card["lecture_id"],
@@ -121,6 +127,7 @@ def save_flashcard(card: dict):
                 card["back"],
                 json.dumps(card.get("tags", [])),
                 card.get("difficulty"),
+                card.get("chapter"),
                 card.get("source_lecture"),
                 card.get("source_course"),
                 card.get("chunk_hash"),
