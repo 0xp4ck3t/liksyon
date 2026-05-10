@@ -3,8 +3,8 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from src.liksyon.chunker import chunk_transcript, count_tokens
-from src.liksyon.storage import (
+from liksyon.chunker import chunk_transcript, count_tokens
+from liksyon.storage import (
     chunk_hash,
     is_chunk_processed,
     mark_chunk_processed,

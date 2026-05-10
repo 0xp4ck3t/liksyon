@@ -141,13 +141,20 @@ def open_apkg(apkg_path: Path):
         subprocess.run(["start", str(apkg_path)], shell=True)
 
 
-def deliver_to_anki(flashcards: list[dict], course_title: str, apkg_path: Path):
+def deliver_to_anki(
+    flashcards: list[dict],
+    course_title: str,
+    apkg_path: Path,
+    interactive: bool = True,
+):
     """
     Full delivery flow:
     1. Always export .apkg (silent backup)
     2. Try AnkiConnect
-    3. If not running, offer to open Anki and retry
+    3. If not running, offer (or auto) to open Anki and retry
     4. If still fails, auto-open the .apkg
+
+    Set interactive=False (TUI mode) to skip stdin prompts.
     """
     print(f"\nBackup saved → {apkg_path}")
 
@@ -167,17 +174,25 @@ def deliver_to_anki(flashcards: list[dict], course_title: str, apkg_path: Path):
         print(f"Or import the backup file manually: {apkg_path}")
         return
 
-    answer = input("Open Anki now and push cards? (Y/n): ").strip().lower()
-    if answer in ("", "y", "yes"):
+    if interactive:
+        answer = input("Open Anki now and push cards? (Y/n): ").strip().lower()
+        should_launch = answer in ("", "y", "yes")
+    else:
+        print("Auto-launching Anki...")
+        should_launch = True
+
+    if should_launch:
         launch_anki()
         connected = wait_for_ankiconnect(timeout=30)
         if connected:
             pushed = push_cards(flashcards, course_title)
             print(f"Pushed {pushed} card(s) to Anki.")
-            print(f"Tip: Install AnkiConnect plugin (code: {ANKI_CONNECT_PLUGIN}) to skip this step next time.")
+            if interactive:
+                print(f"Tip: Install AnkiConnect plugin (code: {ANKI_CONNECT_PLUGIN}) to skip this step next time.")
             return
 
     # --- Fallback: open .apkg ---
     print("Opening .apkg for manual import...")
     open_apkg(apkg_path)
-    print(f"Tip: Install AnkiConnect plugin (code: {ANKI_CONNECT_PLUGIN}) for seamless sync next time.")
+    if interactive:
+        print(f"Tip: Install AnkiConnect plugin (code: {ANKI_CONNECT_PLUGIN}) for seamless sync next time.")

@@ -22,7 +22,7 @@ dependencies = [
 ]
 
 [project.scripts]
-liksyon = "liksyon.cli:app"
+liksyon = "liksyon.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/liksyon"]
