@@ -123,15 +123,20 @@ def run_agent(
     transcripts: list[dict],
     course_title: str,
     max_cards_per_lecture: int = 10,
+    progress_cb=None,
+    chunk_start_cb=None,
 ) -> list[dict]:
-    check_claude_installed()  # validates early before processing begins
+    check_claude_installed()
     skill = load_skill("make_flashcards")
     all_cards = []
 
-    for lecture in transcripts:
-        if not lecture.get("transcript"):
-            continue
+    valid = [l for l in transcripts if l.get("transcript")]
+    total_chunks = sum(len(chunk_transcript(l["transcript"])) for l in valid)
+    chunks_done  = 0
+    cards_total  = 0
+    skipped      = 0
 
+    for lecture in valid:
         lecture_id    = lecture["id"]
         lecture_title = lecture["title"]
         chapter       = lecture.get("chapter", "")
@@ -144,17 +149,27 @@ def run_agent(
 
         for chunk in chunks:
             h = chunk_hash(chunk["text"])
+            chunks_done += 1
 
             if is_chunk_processed(h):
                 print(f"    chunk {chunk['chunk_index'] + 1} — already processed, skipping")
+                skipped += 1
+                if progress_cb:
+                    progress_cb(chunks_done, total_chunks, cards_total, skipped)
                 continue
 
             print(f"    chunk {chunk['chunk_index'] + 1}/{len(chunks)} — {chunk['token_count']} tokens")
+
+            if chunk_start_cb:
+                chunk_start_cb(chunks_done - 1, total_chunks)
 
             try:
                 cards = _generate_cards_for_chunk(chunk, lecture_title, chapter, course_title, skill)
             except Exception as e:
                 print(f"    ✗ failed: {e}")
+                skipped += 1
+                if progress_cb:
+                    progress_cb(chunks_done, total_chunks, cards_total, skipped)
                 continue
 
             mark_chunk_processed(h, lecture_id, chunk["chunk_index"])
@@ -172,6 +187,10 @@ def run_agent(
                     "source_course":  course_title,
                     "chunk_hash":     h,
                 })
+
+            cards_total += len(cards)
+            if progress_cb:
+                progress_cb(chunks_done, total_chunks, cards_total, skipped)
 
         if len(lecture_cards) > max_cards_per_lecture:
             lecture_cards = lecture_cards[:max_cards_per_lecture]

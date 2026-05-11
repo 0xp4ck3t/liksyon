@@ -149,6 +149,14 @@ def get_flashcards(course_id: str) -> list[dict]:
         return cards
 
 
+def update_flashcard(card_id: int, front: str, back: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE flashcards SET front = ?, back = ? WHERE id = ?",
+            (front, back, card_id),
+        )
+
+
 def get_unprocessed_lectures(course_id: str) -> list[dict]:
     """Return transcripts that have no flashcards yet."""
     with get_connection() as conn:

@@ -139,7 +139,8 @@ class UdemyScraper:
         courses = []
         url = (
             "https://www.udemy.com/api-2.0/users/me/subscribed-courses/"
-            "?page_size=100&ordering=-last_accessed&fields[course]=id,title,url"
+            "?page_size=100&ordering=-last_accessed"
+            "&fields[course]=id,title,url,visible_instructors,content_info,completion_ratio"
         )
         while url:
             data = self._api_get(url)
@@ -171,6 +172,7 @@ class UdemyScraper:
                     "chapter": current_chapter,
                     "caption_url": caption["url"] if caption else None,
                     "locale": caption.get("locale_id") if caption else None,
+                    "duration": asset.get("time_estimation") or 0,
                 })
         return lectures
 
@@ -197,10 +199,17 @@ class UdemyScraper:
         deduped = [lines[i] for i in range(len(lines)) if i == 0 or lines[i] != lines[i - 1]]
         return " ".join(deduped)
 
-    def scrape_lectures(self, lectures: list[dict], course_id: str) -> list[dict]:
+    def scrape_lectures(
+        self,
+        lectures: list[dict],
+        course_id: str,
+        progress_cb=None,
+    ) -> list[dict]:
         transcripts = []
         for i, lecture in enumerate(lectures):
             print(f"  [{i + 1}/{len(lectures)}] {lecture['chapter']} — {lecture['title']}")
+            if progress_cb:
+                progress_cb(i + 1, len(lectures), lecture["title"])
             if lecture["caption_url"]:
                 try:
                     vtt = self._fetch_vtt(lecture["caption_url"])
