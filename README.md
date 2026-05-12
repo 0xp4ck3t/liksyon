@@ -6,6 +6,8 @@ A terminal-based study tool that turns your Udemy courses into Anki flashcards u
 
 Quizzes and additional study formats are planned for future iterations.
 
+![Liksyon demo](files/demo.gif)
+
 ---
 
 ## How it works
