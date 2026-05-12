@@ -11,13 +11,22 @@ from liksyon.storage import (
     save_flashcard,
 )
 
-SKILLS_DIR = Path(__file__).parents[2] / ".claude" / "skills"
+_SKILLS_SEARCH = [
+    Path(__file__).parent / "skills",               # installed package (bundled)
+    Path(__file__).parents[2] / ".claude" / "skills",  # dev / editable install
+]
 
 
 def load_skill(name: str) -> str:
-    skill_file = SKILLS_DIR / name / "SKILL.md"
-    if not skill_file.exists():
-        raise FileNotFoundError(f"Skill not found: {skill_file}")
+    for base in _SKILLS_SEARCH:
+        skill_file = base / name / "SKILL.md"
+        if skill_file.exists():
+            break
+    else:
+        raise FileNotFoundError(
+            f"Skill '{name}' not found. Searched:\n"
+            + "\n".join(f"  {b / name / 'SKILL.md'}" for b in _SKILLS_SEARCH)
+        )
     content = skill_file.read_text()
     # strip YAML frontmatter
     if content.startswith("---"):
