@@ -605,6 +605,29 @@ Button {
     color: #8B949E;
 }
 
+/* ── Help screen ────────────────────────────────────── */
+
+#help-outer {
+    height: 1fr;
+    overflow-y: auto;
+    padding: 0 4 2 4;
+}
+
+#help-section-title {
+    color: #38BDF8;
+    text-style: bold;
+    padding: 1 0 0 0;
+}
+
+#help-footer {
+    dock: bottom;
+    height: 3;
+    border-top: solid #1F2937;
+    background: #0B1118;
+    padding: 0 2;
+    content-align: left middle;
+}
+
 /* ── Configure screen ───────────────────────────────── */
 
 #cfg-title {
@@ -679,7 +702,7 @@ class SplashScreen(Screen):
         ("≡",  "Flashcard Library",  "Browse and manage your flashcards",   "stub"),
         ("↑",  "Import",             "Import from file or other sources",   "stub"),
         ("⚙",  "Settings",           "Configure Liksyon",                   "stub"),
-        ("?",  "Help",               "Documentation and usage guide",        "stub"),
+        ("?",  "Help",               "Documentation and usage guide",        "help"),
         ("→",  "Quit",               "Exit Liksyon",                         "quit"),
     ]
 
@@ -723,6 +746,8 @@ class SplashScreen(Screen):
         action = self.MENU[idx][3]
         if action == "start":
             self.app.push_screen(BrowserScreen())
+        elif action == "help":
+            self.app.push_screen(HelpScreen())
         elif action == "quit":
             self.app.exit()
         else:
@@ -730,6 +755,113 @@ class SplashScreen(Screen):
 
     def action_select_item(self) -> None:
         self.query_one(ListView).action_select_cursor()
+
+
+class HelpScreen(Screen):
+    TITLE = "Liksyon — Help"
+
+    BINDINGS = [
+        Binding("escape", "back", "Back", show=False),
+        Binding("q",      "back", "Back", show=False),
+    ]
+
+    CONTENT = """\
+[bold #38BDF8]What is Liksyon?[/]
+
+Liksyon is a terminal-based study tool that turns your Udemy courses into Anki
+flashcards using AI. It fetches video transcripts, processes them with Claude,
+and lets you review and export the generated cards directly into Anki.
+
+
+[bold #38BDF8]How it works[/]
+
+  [bold #38BDF8]1. Select Browser[/]    Choose the browser where you're logged into Udemy.
+                    Liksyon reads your session cookies — no password needed.
+
+  [bold #38BDF8]2. Select Course[/]     Pick any course from your Udemy library.
+                    Use [reverse] / [/] to search by title or instructor.
+
+  [bold #38BDF8]3. Select Sections[/]   Choose which sections or individual lectures to process.
+                    Press [reverse] Space [/] to toggle, [reverse] Enter [/] to expand a section.
+
+  [bold #38BDF8]4. Configure[/]         Set card style, difficulty, and cards per lecture.
+
+  [bold #38BDF8]5. Generate[/]          Claude processes each transcript chunk and creates cards.
+                    Already-processed chunks are skipped automatically on re-runs.
+
+  [bold #38BDF8]6. Review[/]            Go through each card — keep, skip, or flag for review.
+                    Press [reverse] E [/] to edit a card inline.
+
+  [bold #38BDF8]7. Export[/]            Push cards to Anki via AnkiConnect, save as .apkg,
+                    or export as CSV.
+
+
+[bold #38BDF8]Global keys[/]
+
+  [reverse] ↑ ↓ [/]      Navigate lists and tables
+  [reverse] Enter [/]    Select / confirm
+  [reverse] Esc [/]      Go back
+  [reverse] q [/]        Quit
+
+
+[bold #38BDF8]Course screen[/]
+
+  [reverse] / [/]        Focus search bar
+  [reverse] r [/]        Refresh course list
+  [reverse] b [/]        Go back
+
+
+[bold #38BDF8]Select Sections screen[/]
+
+  [reverse] Space [/]    Toggle section or lecture on/off
+  [reverse] → [/]        Expand section to show individual lectures
+  [reverse] ← [/]        Collapse section
+  [reverse] A [/]        Select all sections
+  [reverse] N [/]        Deselect all
+  [reverse] Enter [/]    Continue to Configure
+
+
+[bold #38BDF8]Review screen[/]
+
+  [reverse] Space [/]    Cycle card status: Keep → Skip → Review
+  [reverse] E [/]        Edit card front and back
+  [reverse] Enter [/]    Continue to Export
+  [reverse] Esc [/]      Go back
+
+
+[bold #38BDF8]AnkiConnect setup[/]
+
+  To push cards directly into Anki:
+    1. Open Anki
+    2. Tools → Add-ons → Get Add-ons
+    3. Enter code  2055492159  (AnkiConnect)
+    4. Restart Anki
+    5. Keep Anki open when you reach the Export screen
+
+
+[bold #38BDF8]Notes[/]
+
+  • Only courses you own on Udemy are processed
+  • Lectures without captions are skipped
+  • Cards and transcripts are cached in  data/liksyon.db
+  • Exported .apkg files are saved to the  exports/  directory
+  • Re-running a session skips already-processed chunks automatically
+"""
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static(
+            "Help",
+            id="breadcrumb",
+        )
+        yield Static(self.CONTENT, id="help-outer")
+        yield Static(
+            " [reverse] Esc [/] Back    [reverse] q [/] Quit",
+            id="help-footer",
+        )
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
 
 class BrowserScreen(Screen):

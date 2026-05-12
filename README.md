@@ -1,7 +1,5 @@
 # Liksyon
 
-> *Liksyon* is Haitian Creole for "lesson."
-
 A terminal-based study tool that turns your Udemy courses into Anki flashcards using AI. Pick a course, select sections, and Liksyon fetches the video transcripts, runs them through Claude, and generates context-aware flashcards you can review and export directly to Anki.
 
 Quizzes and additional study formats are planned for future iterations.
@@ -95,6 +93,24 @@ To push cards directly into Anki:
 - Transcripts are fetched from Udemy's closed-caption API — lectures without captions are skipped
 - Cards and transcripts are cached locally in `data/liksyon.db` so re-runs skip already-processed chunks
 - Exported `.apkg` files are saved to the `exports/` directory
+
+---
+
+## Roadmap
+
+| Status | Feature |
+|--------|---------|
+| ✅ | Udemy transcript scraping |
+| ✅ | Claude-powered flashcard generation |
+| ✅ | Anki export (AnkiConnect + .apkg + CSV) |
+| ✅ | Section/lecture picker |
+| ✅ | Review and inline edit |
+| 🔜 | **Import** — generate cards from local files (.txt, .pdf, .srt, .vtt) |
+| 🔜 | **Sessions** — save, resume, and browse past study sessions |
+| 🔜 | **YouTube support** — generate cards from YouTube videos via transcript API |
+| 🔜 | **Quizzes** — interactive quiz mode alongside flashcards |
+| 🔜 | **Multi-LLM** — support for OpenAI, Gemini, and other providers alongside Claude |
+| 🔜 | **Flashcard Library** — browse and manage all cards across sessions |
 
 ---
 
