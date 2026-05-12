@@ -1760,6 +1760,7 @@ class ProcessScreen(Screen):
         run_agent(
             transcripts,
             course_title=course["title"],
+            config=self.app.config,
             progress_cb=on_chunk_done,
             chunk_start_cb=on_chunk_start,
         )

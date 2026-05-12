@@ -57,9 +57,50 @@ def pick_browser() -> str:
         print(f"  Enter a number between 1 and {len(BROWSERS)}.")
 
 
+def _is_wsl() -> bool:
+    try:
+        return Path("/proc/version").read_text().lower().find("microsoft") != -1
+    except Exception:
+        return False
+
+
+def _wsl_windows_user() -> str | None:
+    """Return the Windows username when running under WSL."""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ["cmd.exe", "/c", "echo %USERNAME%"],
+            capture_output=True, text=True, timeout=5
+        )
+        name = result.stdout.strip()
+        return name if name and name != "%USERNAME%" else None
+    except Exception:
+        return None
+
+
 def _find_firefox_cookie_file() -> str:
     os_name = platform.system()
-    if os_name == "Darwin":
+
+    if os_name == "Linux" and _is_wsl():
+        # Firefox is installed on Windows — profile lives in the Windows filesystem
+        win_user = _wsl_windows_user()
+        candidates = []
+        if win_user:
+            candidates.append(
+                Path(f"/mnt/c/Users/{win_user}/AppData/Roaming/Mozilla/Firefox/Profiles")
+            )
+        # also try common Windows drive mount points
+        for drive in ("c", "d"):
+            for user_dir in Path(f"/mnt/{drive}/Users").glob("*/AppData/Roaming/Mozilla/Firefox/Profiles") if Path(f"/mnt/{drive}/Users").exists() else []:
+                candidates.append(user_dir)
+        base = next((p for p in candidates if p.exists()), None)
+        if base is None:
+            raise FileNotFoundError(
+                "Firefox profiles folder not found on Windows filesystem. "
+                "Make sure Firefox is installed on Windows (not inside WSL) "
+                "and that you are logged into Udemy in Firefox."
+            )
+    elif os_name == "Darwin":
         base = Path.home() / "Library/Application Support/Firefox/Profiles"
     elif os_name == "Linux":
         base = Path.home() / ".mozilla/firefox"
@@ -96,6 +137,14 @@ def load_browser_cookies(browser: str) -> requests.cookies.RequestsCookieJar:
         if browser == "firefox":
             cookie_file = _find_firefox_cookie_file()
             return loader(cookie_file=cookie_file, domain_name=".udemy.com")
+        if _is_wsl() and browser in ("chrome", "chromium", "edge", "brave"):
+            raise RuntimeError(
+                f"Cannot read {browser} cookies from WSL.\n"
+                "Chrome-based browsers encrypt cookies with Windows DPAPI, "
+                "which is not accessible from WSL.\n"
+                "Use Firefox instead — it stores cookies in plain SQLite "
+                "and works correctly from WSL."
+            )
         return loader(domain_name=".udemy.com")
     except RuntimeError:
         raise

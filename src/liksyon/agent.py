@@ -100,12 +100,28 @@ def extract_json(text: str) -> dict:
     raise ValueError(f"Could not parse JSON from Claude output:\n{text[:500]}")
 
 
+_DENSITY_RANGE = {
+    "Light (fewer cards)":      "2 to 4",
+    "Balanced (recommended)":   "4 to 7",
+    "Detailed (more cards)":    "7 to 12",
+}
+
+_DENSITY_MAX = {
+    "Light (fewer cards)":      5,
+    "Balanced (recommended)":   10,
+    "Detailed (more cards)":    20,
+}
+
+
 def _generate_cards_for_chunk(
     chunk: dict,
     lecture_title: str,
     chapter: str,
     course_title: str,
     skill: str,
+    card_style: str = "Basic Q&A",
+    difficulty_level: str = "Intermediate",
+    card_count_range: str = "4 to 7",
 ) -> list[dict]:
     prompt = render_skill(
         skill,
@@ -113,6 +129,9 @@ def _generate_cards_for_chunk(
         chapter=chapter,
         lecture_title=lecture_title,
         transcript=chunk["text"],
+        card_style=card_style,
+        difficulty_level=difficulty_level,
+        card_count_range=card_count_range,
     )
     raw = call_claude(prompt)
     data = extract_json(raw)
@@ -122,13 +141,20 @@ def _generate_cards_for_chunk(
 def run_agent(
     transcripts: list[dict],
     course_title: str,
-    max_cards_per_lecture: int = 10,
+    config: dict | None = None,
     progress_cb=None,
     chunk_start_cb=None,
 ) -> list[dict]:
     check_claude_installed()
     skill = load_skill("make_flashcards")
     all_cards = []
+
+    cfg              = config or {}
+    card_style       = cfg.get("card_style",   "Basic Q&A")
+    difficulty_level = cfg.get("difficulty",   "Intermediate")
+    density_label    = cfg.get("card_density", "Balanced (recommended)")
+    card_count_range = _DENSITY_RANGE.get(density_label, "4 to 7")
+    max_cards        = _DENSITY_MAX.get(density_label, 10)
 
     valid = [l for l in transcripts if l.get("transcript")]
     total_chunks = sum(len(chunk_transcript(l["transcript"])) for l in valid)
@@ -164,7 +190,12 @@ def run_agent(
                 chunk_start_cb(chunks_done - 1, total_chunks)
 
             try:
-                cards = _generate_cards_for_chunk(chunk, lecture_title, chapter, course_title, skill)
+                cards = _generate_cards_for_chunk(
+                    chunk, lecture_title, chapter, course_title, skill,
+                    card_style=card_style,
+                    difficulty_level=difficulty_level,
+                    card_count_range=card_count_range,
+                )
             except Exception as e:
                 print(f"    ✗ failed: {e}")
                 skipped += 1
@@ -192,8 +223,8 @@ def run_agent(
             if progress_cb:
                 progress_cb(chunks_done, total_chunks, cards_total, skipped)
 
-        if len(lecture_cards) > max_cards_per_lecture:
-            lecture_cards = lecture_cards[:max_cards_per_lecture]
+        if len(lecture_cards) > max_cards:
+            lecture_cards = lecture_cards[:max_cards]
 
         for card in lecture_cards:
             save_flashcard(card)
