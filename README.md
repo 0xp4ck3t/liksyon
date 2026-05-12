@@ -31,6 +31,8 @@ Quizzes and additional study formats are planned for future iterations.
 
 ## Install
 
+### macOS / Linux / WSL
+
 ```bash
 curl -fsSL https://raw.githubusercontent.com/0xp4ck3t/liksyon/main/scripts/install.sh | bash
 ```
@@ -45,6 +47,22 @@ liksyon
 > ```bash
 > echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 > ```
+
+### Windows (PowerShell)
+
+```powershell
+py -m pip install --user pipx
+py -m pipx ensurepath
+pipx install git+https://github.com/0xp4ck3t/liksyon.git
+```
+
+Close and reopen PowerShell, then run:
+
+```powershell
+liksyon
+```
+
+> **Note:** On Windows, only Firefox is supported for cookie reading. Chrome-based browsers use DPAPI encryption that blocks access from outside the browser process.
 
 ---
 
