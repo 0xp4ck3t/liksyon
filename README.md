@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="files/liksyon.png" alt="Liksyon" width="200"/>
-</p>
-
 # Liksyon
 
 A terminal-based study tool that turns your Udemy courses into Anki flashcards using AI. Pick a course, select sections, and Liksyon fetches the video transcripts, runs them through Claude, and generates context-aware flashcards you can review and export directly to Anki.
