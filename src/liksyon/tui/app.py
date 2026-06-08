@@ -36,6 +36,7 @@ from liksyon.export.ankiconnect import (
 from liksyon.export.genanki_export import export_to_apkg
 from liksyon.scraper import UdemyScraper, load_browser_cookies
 from liksyon.storage import get_flashcards, init_db, save_transcript, update_flashcard
+from liksyon.youtube_scraper import fetch_youtube_transcript
 
 BROWSERS = [
     ("chrome",   "🌐", "Google Chrome",   "/Applications/Google Chrome.app"),
@@ -675,6 +676,70 @@ Button {
     height: 3;
     content-align: left middle;
 }
+
+/* ── SourceScreen ─────────────────────────────────────── */
+
+#source-content {
+    width: 70;
+    height: auto;
+    padding: 2 4;
+}
+
+#source-title {
+    margin: 0 0 1 0;
+}
+
+#source-subtitle {
+    margin: 0 0 2 0;
+    color: #8B949E;
+}
+
+#source-list {
+    height: auto;
+    border: none;
+}
+
+/* ── YouTubeScreen ────────────────────────────────────── */
+
+#yt-title {
+    margin: 1 2 0 2;
+}
+
+#yt-desc {
+    margin: 0 2 1 2;
+    color: #8B949E;
+}
+
+#yt-input-row {
+    height: 3;
+    margin: 0 2;
+}
+
+#yt-url-input {
+    width: 1fr;
+}
+
+#yt-status {
+    margin: 0 2;
+    height: 1;
+}
+
+#yt-table {
+    margin: 1 2;
+    height: 1fr;
+}
+
+#yt-count {
+    margin: 0 2 1 2;
+    color: #8B949E;
+    height: 1;
+}
+
+#yt-hint {
+    margin: 0 2 1 2;
+    color: #3D5166;
+    height: 1;
+}
 """
 
 
@@ -745,7 +810,7 @@ class SplashScreen(Screen):
         idx = int(event.item.id.split("-")[1])
         action = self.MENU[idx][3]
         if action == "start":
-            self.app.push_screen(BrowserScreen())
+            self.app.push_screen(SourceScreen())
         elif action == "help":
             self.app.push_screen(HelpScreen())
         elif action == "quit":
@@ -755,6 +820,208 @@ class SplashScreen(Screen):
 
     def action_select_item(self) -> None:
         self.query_one(ListView).action_select_cursor()
+
+
+class SourceScreen(Screen):
+    TITLE = "Liksyon — Select Source"
+
+    BINDINGS = [
+        Binding("escape", "back", "Back", show=False),
+        Binding("q",      "back", "Back", show=False),
+    ]
+
+    SOURCES = [
+        ("▶", "Udemy",   "Generate flashcards from your Udemy courses", "udemy"),
+        ("▶", "YouTube", "Generate flashcards from YouTube videos",     "youtube"),
+    ]
+
+    FOOTER = (
+        " [reverse] ↑ [/] [reverse] ↓ [/] Navigate"
+        "    [reverse] Enter [/] Select"
+        "    [reverse] Esc [/] Back"
+    )
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static(
+            "Start New Session  [bold #38BDF8]›[/]  [bold]Select Source[/]",
+            id="breadcrumb",
+        )
+        yield Center(
+            Vertical(
+                Static("[bold #38BDF8]Select Source[/]", id="source-title"),
+                Static(
+                    "[dim]Where do you want to generate flashcards from?[/dim]",
+                    id="source-subtitle",
+                ),
+                ListView(
+                    *[
+                        ListItem(
+                            Label(
+                                f" {icon}  [bold]{label:<12}[/bold]  [dim]{desc}[/dim]",
+                                markup=True,
+                            ),
+                            id=f"src-{i}",
+                        )
+                        for i, (icon, label, desc, _) in enumerate(self.SOURCES)
+                    ],
+                    id="source-list",
+                ),
+                id="source-content",
+            ),
+        )
+        yield Static(self.FOOTER, id="splash-footer")
+
+    def on_mount(self) -> None:
+        self.query_one(ListView).focus()
+
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        idx = int(event.item.id.split("-")[1])
+        _, _, _, key = self.SOURCES[idx]
+        self.app.source = key
+        if key == "udemy":
+            self.app.push_screen(BrowserScreen())
+        else:
+            self.app.push_screen(YouTubeScreen())
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
+
+
+class YouTubeScreen(Screen):
+    TITLE = "Liksyon — YouTube"
+
+    BINDINGS = [
+        Binding("escape", "back",         "Back",   show=False),
+        Binding("d",      "delete_video", "Remove", show=False),
+    ]
+
+    FOOTER = (
+        " [reverse] Enter [/] Add URL"
+        "    [reverse] D [/] Remove selected"
+        "    [reverse] Esc [/] Back"
+    )
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Static(
+            "Start New Session  [bold #38BDF8]›[/]  [bold]YouTube[/]",
+            id="breadcrumb",
+        )
+        yield Static("[bold #38BDF8]Add YouTube Videos[/]", id="yt-title")
+        yield Static(
+            "Paste a YouTube URL and press [bold]Enter[/bold] to add it.",
+            id="yt-desc",
+        )
+        yield Input(
+            placeholder="https://www.youtube.com/watch?v=…",
+            id="yt-url-input",
+        )
+        yield Static("", id="yt-status")
+        yield DataTable(id="yt-table", cursor_type="row")
+        yield Static("", id="yt-count")
+        yield Static(
+            "[dim]Leave the URL field empty and press Enter to continue →[/dim]",
+            id="yt-hint",
+        )
+        yield Static(self.FOOTER, id="splash-footer")
+
+    def on_mount(self) -> None:
+        self._videos: list[dict] = []
+        t = self.query_one(DataTable)
+        t.add_column("#",          width=4)
+        t.add_column("Title",      width=46)
+        t.add_column("Channel",    width=22)
+        t.add_column("Transcript", width=12)
+        self.query_one(Input).focus()
+
+    async def on_input_submitted(self, event: Input.Submitted) -> None:
+        url = event.value.strip()
+        if not url:
+            self._do_confirm()
+            return
+        event.input.clear()
+        await self._add_video(url)
+
+    async def _add_video(self, url: str) -> None:
+        status = self.query_one("#yt-status", Static)
+        status.update("[dim]Fetching video info…[/]")
+        try:
+            info = await asyncio.to_thread(fetch_youtube_transcript, url)
+        except Exception as exc:
+            status.update(f"[bold red]✗[/] {exc}")
+            return
+        # Deduplicate by video_id
+        existing_ids = {v["video_id"] for v in self._videos}
+        if info["video_id"] in existing_ids:
+            status.update("[dim]Already added.[/]")
+            return
+        self._videos.append(info)
+        self._rebuild_table()
+        title_short = info["title"][:48] + ("…" if len(info["title"]) > 48 else "")
+        status.update(f"[bold #22C55E]✓[/] Added: {title_short}")
+
+    def _rebuild_table(self) -> None:
+        t = self.query_one(DataTable)
+        t.clear()
+        for i, v in enumerate(self._videos):
+            has_t = "✓  yes" if v.get("transcript") else "✗  none"
+            t.add_row(
+                str(i + 1),
+                (v["title"][:45] + "…" if len(v["title"]) > 45 else v["title"]),
+                (v["channel"][:21] + "…" if len(v["channel"]) > 21 else v["channel"]),
+                has_t,
+            )
+        n = len(self._videos)
+        self.query_one("#yt-count", Static).update(
+            f"  [bold]{n}[/] video{'s' if n != 1 else ''} added" if n else ""
+        )
+
+    def action_delete_video(self) -> None:
+        t = self.query_one(DataTable)
+        row = t.cursor_row
+        if 0 <= row < len(self._videos):
+            removed = self._videos.pop(row)
+            self._rebuild_table()
+            self.query_one("#yt-status", Static).update(
+                f"[dim]Removed: {removed['title'][:50]}[/]"
+            )
+
+    def _do_confirm(self) -> None:
+        if not self._videos:
+            self.query_one("#yt-status", Static).update(
+                "[dim]Add at least one video to continue.[/]"
+            )
+            return
+        with_transcript = [v for v in self._videos if v.get("transcript")]
+        if not with_transcript:
+            self.query_one("#yt-status", Static).update(
+                "[bold red]✗[/] No transcripts available — cannot generate cards."
+            )
+            return
+        session_id = f"yt_{with_transcript[0]['video_id']}"
+        self.app.course = {
+            "title": (
+                with_transcript[0]["title"]
+                if len(with_transcript) == 1
+                else "YouTube Videos"
+            ),
+            "id": session_id,
+        }
+        self.app.selected_lectures = [
+            {
+                "id":         v["id"],
+                "title":      v["title"],
+                "chapter":    v["channel"],
+                "course_id":  session_id,
+                "transcript": v["transcript"],
+            }
+            for v in with_transcript
+        ]
+        self.app.push_screen(ConfigureScreen())
+
+    def action_back(self) -> None:
+        self.app.pop_screen()
 
 
 class HelpScreen(Screen):
@@ -1504,10 +1771,12 @@ class ConfigureScreen(Screen):
     _DEFAULTS = [0, 1, 1, 0]
 
     def compose(self) -> ComposeResult:
-        course = self.app.course
+        course  = self.app.course
+        source  = getattr(self.app, "source", "udemy")
+        src_lbl = "YouTube" if source == "youtube" else "Select Course"
         yield Header()
         yield Static(
-            "Start New Session  [bold #38BDF8]›[/]  Select Course"
+            f"Start New Session  [bold #38BDF8]›[/]  {src_lbl}"
             "  [bold #38BDF8]›[/]  [bold]Configure[/]",
             id="breadcrumb",
         )
@@ -2234,7 +2503,8 @@ class DoneScreen(Screen):
             except Exception:
                 pass
         elif key == "new_session":
-            # pop Done, Export, Review, Process, Configure → lands on LectureScreen
+            # pop Done, Export, Review, Process, Configure
+            # → lands on LectureScreen (Udemy) or YouTubeScreen (YouTube)
             for _ in range(5):
                 self.app.pop_screen()
         elif key == "quit":
@@ -2247,6 +2517,7 @@ class LiksyonApp(App):
     TITLE = "Liksyon"
 
     # shared state across screens
+    source: str = ""
     browser: str = ""
     courses: list = []
     course: dict = {}
