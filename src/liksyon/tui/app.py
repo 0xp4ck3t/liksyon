@@ -784,7 +784,7 @@ class SplashScreen(Screen):
             Vertical(
                 Static(self.LOGO, id="logo"),
                 Static(
-                    "[dim]AI-powered flashcards from your Udemy courses[/dim]",
+                    "[dim]AI-powered flashcards from YouTube videos and Udemy courses[/dim]",
                     id="tagline",
                 ),
                 ListView(
@@ -1993,12 +1993,15 @@ class ProcessScreen(Screen):
         course_id = str(course["id"])
 
         set_step(0)
-        total_lec = len(lectures)
 
-        def fetch_cb(done: int, total: int, title: str) -> None:
-            set_step(0, f"{done}/{total}  {title}")
-
-        transcripts = scraper.scrape_lectures(lectures, course_id, progress_cb=fetch_cb)
+        if scraper is not None:
+            # Udemy: fetch transcripts via the scraper
+            def fetch_cb(done: int, total: int, title: str) -> None:
+                set_step(0, f"{done}/{total}  {title}")
+            transcripts = scraper.scrape_lectures(lectures, course_id, progress_cb=fetch_cb)
+        else:
+            # YouTube (or any pre-fetched source): transcripts already in selected_lectures
+            transcripts = lectures
 
         set_step(1)
         for t in transcripts:
